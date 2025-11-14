@@ -1,3 +1,18 @@
+This is a macOS port of raw(gl).
+To install:
+if you don't have homebrew installed, type this in the terminal:
+```
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+then type this to install the needed dependencies:
+```
+brew install sdl2 sdl2_mixer mt32emu
+```
+(you'll need to do it again with the Terminal in Rosetta mode for the universal binary to correctly compile)
+- clone the repository
+- in the Terminal, navigate to the local folder where the repository was cloned
+- type Make
+you should have rawgl.app created in the folder. It still needs the game files to run. In the 32 bits Mac version of Another World 20th anniversary edition, you'll find them by right-clicking Another World.app in the Finder and selecting "show contents", navigate to Contents/Resources/ and copy all the files inside, then likewise right click rawgl.app and select "show contents", navigate to Contents/Resources/ and paste the files inside it.
 
 # raw(gl) - Another World Interpreter
 
