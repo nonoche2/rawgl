@@ -20,6 +20,8 @@ DEPS = $(SRCS:.cpp=.d)
 ifeq ($(UNAME_S),Darwin)
     # --- macOS specific settings ---
     # Use -framework for system libraries like OpenGL
+    # assumes you have Homebrew installed with these dependencies:
+    # brew install sdl2 sdl2_mixer mt32emu
     SDL_LIBS = `sdl2-config --libs` -lSDL2_mixer -framework OpenGL
     
     # Find mt32emu installed via Homebrew
