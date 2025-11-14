@@ -13,7 +13,8 @@ brew install sdl2 sdl2_mixer mt32emu
 - in the Terminal, navigate to the local folder where the repository was cloned
 - type Make
 
-You should have rawgl.app created in the repository folder. It still needs the game files to run. In the 32 bits Mac version of Another World 20th anniversary edition, you'll find them by right-clicking Another World.app in the Finder and selecting "show contents", navigate to Contents/Resources/ and copy all the files inside, then likewise right click rawgl.app and select "show contents", navigate to Contents/Resources/ and paste the files inside it.
+You should have rawgl.app created in the repository folder. It still needs the game files to run. In the 32 bits Mac version of Another World 20th anniversary edition, you'll find them by right-clicking Another World.app in the Finder and selecting "show contents", navigate to Contents/Resources/ and copy all the files inside
+then go to ~/Library/Application Support/, create a folder named rawgl inside, and paste all the game files inside.
 
 # raw(gl) - Another World Interpreter
 
