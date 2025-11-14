@@ -3,7 +3,9 @@
  * Another World engine rewrite
  * Copyright (C) 2004-2005 Gregory Montoir (cyx@users.sourceforge.net)
  */
-
+#ifdef __APPLE__
+#include "MacHelper.h"
+#endif
 #include <SDL.h>
 #include <getopt.h>
 #include <sys/stat.h>
@@ -117,9 +119,38 @@ static const int DEFAULT_WINDOW_W = 640;
 static const int DEFAULT_WINDOW_H = 400;
 
 int main(int argc, char *argv[]) {
-	char *dataPath = 0;
+    char *dataPath = 0;
+    Language lang = LANG_US;  // Default fallback
+
+#ifdef __APPLE__
+    // On macOS: use bundled Resources folder
+    std::string resourcesPath = getResourcesFolder();
+    if (!resourcesPath.empty()) {
+        dataPath = strdup(resourcesPath.c_str());
+        debug(DBG_INFO, "Using bundled resources: %s", dataPath);
+    }
+
+    // Detect system language
+    std::string sysLang = getSystemLanguage();
+    for (int i = 0; LANGUAGES[i].name; ++i) {
+        if (sysLang == LANGUAGES[i].name) {
+            lang = (Language)LANGUAGES[i].lang;
+            debug(DBG_INFO, "Detected system language: %s", sysLang.c_str());
+            break;
+        }
+    }
+#endif
+
+    // Command-line overrides (as before)
+    if (argc == 2) {
+        struct stat st;
+        if (stat(argv[1], &st) == 0 && S_ISDIR(st.st_mode)) {
+            free(dataPath);  // override bundle path if user specifies
+            dataPath = strdup(argv[1]);
+        }
+    }
+    
 	int part = 16001;
-	Language lang = LANG_FR;
 	int graphicsType = GRAPHICS_GL;
 	DisplayMode dm;
 	dm.mode   = DisplayMode::WINDOWED;
