@@ -123,11 +123,11 @@ int main(int argc, char *argv[]) {
     Language lang = LANG_US;  // Default fallback
 
 #ifdef __APPLE__
-    // On macOS: use bundled Resources folder
-    std::string resourcesPath = getResourcesFolder();
-    if (!resourcesPath.empty()) {
-        dataPath = strdup(resourcesPath.c_str());
-        debug(DBG_INFO, "Using bundled resources: %s", dataPath);
+    // On macOS: use Application Support folder
+    std::string appSupportPath = getApplicationSupportPath();
+    if (!appSupportPath.empty()) {
+        dataPath = strdup(appSupportPath.c_str());
+        debug(DBG_INFO, "Using data path: %s", dataPath);
     }
 
     // Detect system language

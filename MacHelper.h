@@ -4,7 +4,7 @@
 
 #include <string>
 
-std::string getResourcesFolder();
+std::string getApplicationSupportPath();
 std::string getSystemLanguage();
 
 #endif

@@ -8,19 +8,34 @@ static void mac_warning(const char* msg) {
     printf("MacHelper: %s\n", msg);
 }
 
-std::string getResourcesFolder() {
+std::string getApplicationSupportPath() {
     @autoreleasepool {
-        NSBundle *bundle = [NSBundle mainBundle];
-        if (!bundle) {
-            mac_warning("[NSBundle mainBundle] returned nil");
+        NSFileManager *fileManager = [NSFileManager defaultManager];
+        NSArray *paths = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES);
+        if ([paths count] == 0) {
+            mac_warning("NSSearchPathForDirectoriesInDomains for NSApplicationSupportDirectory returned no paths");
             return "";
         }
-        NSString *path = [bundle resourcePath];
-        if (!path) {
-            mac_warning("[mainBundle resourcePath] returned nil");
+
+        NSString *appSupportDir = [paths objectAtIndex:0];
+        NSString *rawglSupportDir = [appSupportDir stringByAppendingPathComponent:@"rawgl"];
+
+        BOOL isDir;
+        if (![fileManager fileExistsAtPath:rawglSupportDir isDirectory:&isDir]) {
+            NSError *error = nil;
+            if (![fileManager createDirectoryAtPath:rawglSupportDir withIntermediateDirectories:YES attributes:nil error:&error]) {
+                mac_warning("Failed to create Application Support directory");
+                if (error) {
+                    printf("Error: %s\n", [[error localizedDescription] UTF8String]);
+                }
+                return "";
+            }
+        } else if (!isDir) {
+            mac_warning("Application Support path exists but is not a directory");
             return "";
         }
-        return std::string([path UTF8String]);
+
+        return std::string([rawglSupportDir UTF8String]);
     }
 }
 

@@ -21,25 +21,20 @@ UNAME_S := $(strip $(shell uname -s))
 ifeq ($(UNAME_S),Darwin)
 
 # === SHARED CONFIGURATION ===
+# Use an ad-hoc signature for local builds. This will not be trusted by Gatekeeper
+# but will allow the app to run via "Open" context menu, instead of crashing.
+CODE_SIGN_IDENTITY = -
+
 SRCS = aifcplayer.cpp bitmap.cpp file.cpp engine.cpp graphics_gl.cpp graphics_soft.cpp \
-       script.cpp mixer.cpp pak.cpp resource.cpp resource_nth.cpp \
-       resource_win31.cpp resource_3do.cpp scaler.cpp screenshot.cpp \
-       systemstub_sdl.cpp sfxplayer.cpp staticres.cpp unpack.cpp util.cpp video.cpp main.cpp \
-       MacHelper.mm
+	script.cpp mixer.cpp pak.cpp resource.cpp resource_nth.cpp \
+	resource_win31.cpp resource_3do.cpp scaler.cpp screenshot.cpp \
+	systemstub_sdl.cpp sfxplayer.cpp staticres.cpp unpack.cpp util.cpp video.cpp main.cpp \
+	MacHelper.mm
        
 DEFINES = -DBYPASS_PROTECTION -DUSE_GL
 
-# Versioned dylibs to find, make universal, and bundle (match otool output)
-DYLIBS_TO_BUNDLE = libSDL2-2.0.0.dylib libSDL2_mixer-2.0.0.dylib libmt32emu.2.dylib
-
-# Exact "old" paths for patching (from otool -L on a non-patched build)
-OLD_SDL2_ARM64 = /opt/homebrew/opt/sdl2/lib/libSDL2-2.0.0.dylib
-OLD_MIXER_ARM64 = /opt/homebrew/opt/sdl2_mixer/lib/libSDL2_mixer-2.0.0.dylib
-OLD_MT32_ARM64 = /opt/homebrew/opt/mt32emu/lib/libmt32emu.2.dylib
-
-OLD_SDL2_X86_64 = /usr/local/opt/sdl2/lib/libSDL2-2.0.0.dylib
-OLD_MIXER_X86_64 = /usr/local/opt/sdl2_mixer/lib/libSDL2_mixer-2.0.0.dylib
-OLD_MT32_X86_64 = /usr/local/opt/mt32emu/lib/libmt32emu.2.dylib
+# List of dylibs to find, make universal, and bundle
+DYLIBS_TO_BUNDLE = libSDL2.dylib libSDL2_mixer.dylib libmt32emu.dylib
 
 # === APPLICATION BUNDLE PATHS ===
 APP_NAME = rawgl.app
@@ -113,18 +108,32 @@ $(EXEC_ARM64): $(OBJS_ARM64)
 	@echo "Linking [ARM64] executable..."
 	@$(CXX_ARM64) $(LDFLAGS_ARM64) -o $@ $^ $(LIBS_ARM64)
 	@echo "Patching [ARM64] executable dylib paths..."
-	@install_name_tool -change $(OLD_SDL2_ARM64) @executable_path/../Frameworks/libSDL2-2.0.0.dylib $@
-	@install_name_tool -change $(OLD_MIXER_ARM64) @executable_path/../Frameworks/libSDL2_mixer-2.0.0.dylib $@
-	@install_name_tool -change $(OLD_MT32_ARM64) @executable_path/../Frameworks/libmt32emu.2.dylib $@
+	@for lib in $(DYLIBS_TO_BUNDLE); do \
+		_BASE_NAME=$$(echo $$lib | sed 's/\.dylib//'); \
+		_OLD_PATH=$$(otool -L $@ | grep -E "/$$_BASE_NAME[-.]" | head -n 1 | cut -d' ' -f1 | xargs); \
+		if [ -n "$$_OLD_PATH" ]; then \
+			echo "  Changing '$$_OLD_PATH' to '@executable_path/../Frameworks/$$lib'"; \
+			install_name_tool -change "$$_OLD_PATH" @executable_path/../Frameworks/$$lib $@; \
+		else \
+			echo "  Warning: Could not find path for $$lib in executable. Skipping."; \
+		fi \
+	done
 
 $(EXEC_X86_64): $(OBJS_X86_64)
 	@mkdir -p $(MACOS)
 	@echo "Linking [x86_64] executable (under Rosetta)..."
 	@$(CXX_X86_64) $(LDFLAGS_X86_64) -o $@ $^ $(LIBS_X86_64)
 	@echo "Patching [x86_64] executable dylib paths..."
-	@install_name_tool -change $(OLD_SDL2_X86_64) @executable_path/../Frameworks/libSDL2-2.0.0.dylib $@
-	@install_name_tool -change $(OLD_MIXER_X86_64) @executable_path/../Frameworks/libSDL2_mixer-2.0.0.dylib $@
-	@install_name_tool -change $(OLD_MT32_X86_64) @executable_path/../Frameworks/libmt32emu.2.dylib $@
+	@for lib in $(DYLIBS_TO_BUNDLE); do \
+		_BASE_NAME=$$(echo $$lib | sed 's/\.dylib//'); \
+		_OLD_PATH=$$(otool -L $@ | grep -E "/$$_BASE_NAME[-.]" | head -n 1 | cut -d' ' -f1 | xargs); \
+		if [ -n "$$_OLD_PATH" ]; then \
+			echo "  Changing '$$_OLD_PATH' to '@executable_path/../Frameworks/$$lib'"; \
+			install_name_tool -change "$$_OLD_PATH" @executable_path/../Frameworks/$$lib $@; \
+		else \
+			echo "  Warning: Could not find path for $$lib in executable. Skipping."; \
+		fi \
+	done
 
 # --- STAGE 3: Create Universal Executable ---
 # Combine the two binaries and remove the intermediate files
@@ -138,37 +147,45 @@ $(EXEC_UNIVERSAL): $(EXEC_ARM64) $(EXEC_X86_64)
 # --- STAGE 4: Build Application Bundle ---
 # This is the final step. It creates the .app structure,
 # copies the universal executable and Info.plist, and
-# creates the universal dylibs.
+# creates and signs the universal dylibs.
 
-$(APP_NAME): $(EXEC_UNIVERSAL) Info.plist
+$(APP_NAME): $(EXEC_UNIVERSAL) Info.plist icon.icns
 	@echo "Creating macOS app bundle structure..."
-	@mkdir -p $(RESOURCES)
-	@mkdir -p $(FRAMEWORKS)
+	@mkdir -p $(RESOURCES) $(FRAMEWORKS)
 	@cp Info.plist $(CONTENTS)/
+	@cp icon.icns $(RESOURCES)/
 
 	@echo "Creating and bundling universal dylibs..."
 	@for lib in $(DYLIBS_TO_BUNDLE); do \
 		echo "  -> Processing $$lib"; \
-		if [ "$$lib" = "libSDL2-2.0.0.dylib" ]; then \
-			arm_path=$(OLD_SDL2_ARM64); \
-			x86_path=$(OLD_SDL2_X86_64); \
-		elif [ "$$lib" = "libSDL2_mixer-2.0.0.dylib" ]; then \
-			arm_path=$(OLD_MIXER_ARM64); \
-			x86_path=$(OLD_MIXER_X86_64); \
-		elif [ "$$lib" = "libmt32emu.2.dylib" ]; then \
-			arm_path=$(OLD_MT32_ARM64); \
-			x86_path=$(OLD_MT32_X86_64); \
-		fi; \
-		lipo -create -output $(FRAMEWORKS)/$$lib $$arm_path $$x86_path; \
+		lipo -create -output $(FRAMEWORKS)/$$lib \
+			$(BREW_ARM64)/lib/$$lib \
+			$(BREW_X86_64)/lib/$$lib; \
 		install_name_tool -id @executable_path/../Frameworks/$$lib $(FRAMEWORKS)/$$lib; \
 	done
 
 	@echo "Fixing dylib cross-dependencies..."
-	@# libSDL2_mixer-2.0.0.dylib depends on libSDL2-2.0.0.dylib. We must update its internal
-	@# path to point to the *bundled* libSDL2-2.0.0.dylib.
-	@# `install_name_tool` will patch both arch slices in the universal dylib.
-	@install_name_tool -change $(OLD_SDL2_ARM64) @executable_path/../Frameworks/libSDL2-2.0.0.dylib $(FRAMEWORKS)/libSDL2_mixer-2.0.0.dylib
-	@install_name_tool -change $(OLD_SDL2_X86_64) @executable_path/../Frameworks/libSDL2-2.0.0.dylib $(FRAMEWORKS)/libSDL2_mixer-2.0.0.dylib
+	@_SDL2_PATH_IN_MIXER=$$(otool -L $(FRAMEWORKS)/libSDL2_mixer.dylib | grep libSDL2 | grep -v libSDL2_mixer | head -n 1 | cut -d' ' -f1 | xargs); \
+	if [ -n "$$_SDL2_PATH_IN_MIXER" ]; then \
+		echo "  Changing libSDL2 path in libSDL2_mixer from '$$_SDL2_PATH_IN_MIXER'"; \
+		install_name_tool -change "$$_SDL2_PATH_IN_MIXER" @executable_path/../Frameworks/libSDL2.dylib $(FRAMEWORKS)/libSDL2_mixer.dylib; \
+	else \
+		echo "  Warning: Could not find libSDL2 path in libSDL2_mixer. Skipping."; \
+	fi
+
+	@echo "Signing bundled dylibs..."
+	@for lib in $(FRAMEWORKS)/*; do \
+		if [ -f "$$lib" ]; then \
+			echo "  Signing $$lib"; \
+			codesign --force --sign "$(CODE_SIGN_IDENTITY)" "$$lib"; \
+		fi \
+	done
+
+	@echo "Signing main executable..."
+	@codesign --force --sign "$(CODE_SIGN_IDENTITY)" $(EXEC_UNIVERSAL)
+
+	@echo "Signing application bundle..."
+	@codesign --force --sign "$(CODE_SIGN_IDENTITY)" $(APP_NAME)
 
 	@echo "---"
 	@echo "UNIVERSAL APP READY: $(APP_NAME)"
@@ -178,14 +195,18 @@ $(APP_NAME): $(EXEC_UNIVERSAL) Info.plist
 
 clean:
 	@echo "Cleaning up build artifacts..."
-	@rm -f *_arm64.o *_x86_64.o
-	@rm -f $(DEPS_ARM64) $(DEPS_X86_64)
-	@rm -f $(EXEC_ARM64) $(EXEC_X86_64) $(EXEC_UNIVERSAL)
+	@rm -f *.o *.d
 	@rm -rf $(APP_NAME)
+	@rm -rf build
+	@echo "Cleaning up tools..."
+	@$(MAKE) -C tools/convert_3do clean
+	@$(MAKE) -C tools/convert_soundfx clean
+	@$(MAKE) -C tools/decode_mat clean
+	@$(MAKE) -C tools/disasm clean
 
 # --- Handle non-macOS ---
 else
-    $(error This Makefile is for macOS only)
+	$(error This Makefile is for macOS only)
 endif
 
 # --- Include auto-generated dependencies ---
