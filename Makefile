@@ -187,6 +187,9 @@ $(APP_NAME): $(EXEC_UNIVERSAL) Info.plist icon.icns
 	@echo "Signing application bundle..."
 	@codesign --force --sign "$(CODE_SIGN_IDENTITY)" $(APP_NAME)
 
+	@# Touch the app bundle to update the icon in Finder
+	@touch $(APP_NAME)
+
 	@echo "---"
 	@echo "UNIVERSAL APP READY: $(APP_NAME)"
 	@echo "---"
