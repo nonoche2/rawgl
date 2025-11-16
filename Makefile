@@ -19,7 +19,7 @@
 # === OS CHECK ===
 UNAME_S := $(strip $(shell uname -s))
 ifeq ($(UNAME_S),Darwin)
-
+export MACOSX_DEPLOYMENT_TARGET ?= 14.0
 # === SHARED CONFIGURATION ===
 # Use an ad-hoc signature for local builds. This will not be trusted by Gatekeeper
 # but will allow the app to run via "Open" context menu, instead of crashing.
